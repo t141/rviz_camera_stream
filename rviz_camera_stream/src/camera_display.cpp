@@ -340,6 +340,7 @@ void CameraPub::onEnable()
 {
   subscribe();
   render_texture_->setActive(true);
+  ROS_INFO_STREAM("enable " << int(video_publisher_->is_active()));
 }
 
 void CameraPub::onDisable()
@@ -352,19 +353,23 @@ void CameraPub::onDisable()
 void CameraPub::subscribe()
 {
   if (!isEnabled())
+  {
     return;
+  }
 
   std::string topic_name = topic_property_->getTopicStd();
   if (topic_name.empty())
   {
-    setStatus(StatusProperty::Error, "Output Topic", "No topic set");
+    setStatus(StatusProperty::Error, "Image Topic", "No topic set");
+    ROS_WARN_STREAM("No image topic set");
     return;
   }
 
   std::string error;
   if (!ros::names::validate(topic_name, error))
   {
-    setStatus(StatusProperty::Error, "Output Topic", QString(error.c_str()));
+    setStatus(StatusProperty::Error, "Image Topic", QString(error.c_str()));
+    ROS_WARN_STREAM(error.c_str());
     return;
   }
 
@@ -373,6 +378,7 @@ void CameraPub::subscribe()
   if (caminfo_topic.empty())
   {
     setStatus(StatusProperty::Error, "Camera Info", "No topic set");
+    ROS_WARN_STREAM("no camera info topic set");
     return;
   }
 
@@ -392,7 +398,8 @@ void CameraPub::subscribe()
   }
 
   video_publisher_->advertise(topic_name);
-  setStatus(StatusProperty::Ok, "Output Topic", "Topic set");
+  setStatus(StatusProperty::Ok, "Image Topic", "Topic set");
+  ROS_INFO_STREAM("fully enabled");
 }
 
 void CameraPub::unsubscribe()

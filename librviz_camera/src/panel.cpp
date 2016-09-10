@@ -23,6 +23,8 @@ Panel::Panel(QWidget* parent)
   const bool enabled = true;
   camera_ = manager_->createDisplay("rviz_camera_stream/CameraPub", "rviz camera", enabled);
   ROS_ASSERT(camera_ != NULL);
+  camera_->subProp("Image Topic")->setValue("image_raw");
+  camera_->subProp("Camera Info Topic")->setValue("camera_info");
 }
 
 Panel::~Panel()
