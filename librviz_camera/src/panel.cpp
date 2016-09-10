@@ -25,6 +25,12 @@ Panel::Panel(QWidget* parent)
   ROS_ASSERT(camera_ != NULL);
   camera_->subProp("Image Topic")->setValue("image_raw");
   camera_->subProp("Camera Info Topic")->setValue("camera_info");
+
+  // TODO(lucasw) later make a service interface that can create any display...
+  // though that just belong in it's own project.
+  display_["grid"] = manager_->createDisplay("rviz/Grid", "grid", true);
+  display_["grid"]->subProp("Line Style")->setValue("Billboards");
+  display_["grid"]->subProp("Color")->setValue(QColor(Qt::yellow));
 }
 
 Panel::~Panel()
