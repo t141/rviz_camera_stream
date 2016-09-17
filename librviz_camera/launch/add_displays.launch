@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+
+  <node name="r1" pkg="rosservice" type="rosservice"
+      args="call /camera1/add_display {name: 'blah1', type: 'rviz/Grid', enable: true}"
+      output="screen"/>
+
+</launch>

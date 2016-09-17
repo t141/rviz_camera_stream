@@ -27,16 +27,21 @@ Panel::Panel(QWidget* parent)
   camera_->subProp("Camera Info Topic")->setValue("camera_info");
 
   display_service_ = nh_.advertiseService("add_display", &Panel::displayCallback, this);
-  // TODO(lucasw) later make a service interface that can create any display...
-  // though that just belong in it's own project.
-  // display_["grid"] = manager_->createDisplay("rviz/Grid", "grid", enabled);
-  // display_["grid"]->subProp("Line Style")->setValue("Billboards");
-  // display_["grid"]->subProp("Color")->setValue(QColor(Qt::yellow));
+
+  timer_ = new QTimer(this);
+  connect(timer_, SIGNAL(timeout()), this, SLOT(update()));
+  timer_->start(100);
 }
 
 Panel::~Panel()
 {
   delete manager_;
+}
+
+void Panel::update()
+{
+  if (!ros::ok())
+    exit(0);
 }
 
 bool Panel::displayCallback(librviz_camera::Display::Request& req,

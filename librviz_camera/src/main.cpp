@@ -22,7 +22,6 @@ int main(int argc, char **argv)
   QApplication app(argc, argv);
   Panel* panel = new Panel();
   panel->hide();
-  // panel->show();
   app.exec();
 
   delete panel;

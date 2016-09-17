@@ -3,6 +3,7 @@
 
 #include <librviz_camera/Display.h>
 #include <map>
+#include <QTimer>
 #include <QWidget>
 #include <ros/ros.h>
 
@@ -21,7 +22,7 @@ public:
   virtual ~Panel();
 
 private Q_SLOTS:
-  // void setThickness(int thickness_percent);
+  void update();
 
 private:
   ros::NodeHandle nh_;
@@ -32,6 +33,8 @@ private:
 
   bool displayCallback(librviz_camera::DisplayRequest& req,
     librviz_camera::DisplayResponse& res);
+
+  QTimer* timer_;
 
   std::map<std::string, rviz::Display*> display_;
 };
