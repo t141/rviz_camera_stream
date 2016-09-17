@@ -1,17 +1,15 @@
 ## BEGIN_TUTORIAL
-## This CMakeLists.txt file for rviz_plugin_tutorials builds both the
-## TeleopPanel tutorial and the ImuDisplay tutorial.
-##
 ## First start with some standard catkin stuff.
 cmake_minimum_required(VERSION 2.8.3)
 project(librviz_camera)
-find_package(catkin REQUIRED COMPONENTS rviz roscpp)
-catkin_package()
-include_directories(
-  include
-  ${catkin_INCLUDE_DIRS}
+
+find_package(catkin REQUIRED COMPONENTS
+  rviz
+  roscpp
+  roslint
 )
-link_directories(${catkin_LIBRARY_DIRS})
+
+roslint_cpp()
 
 ## This setting causes Qt's "MOC" generation to happen automatically.
 set(CMAKE_AUTOMOC ON)
@@ -34,6 +32,23 @@ endif()
 ## etc because they can conflict with boost signals, so define QT_NO_KEYWORDS here.
 add_definitions(-DQT_NO_KEYWORDS)
 
+add_service_files(
+  FILES
+  Display.srv
+)
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
+
+catkin_package()
+
+include_directories(
+  include
+  ${catkin_INCLUDE_DIRS}
+)
+link_directories(${catkin_LIBRARY_DIRS})
+
 ## Here we specify the list of source files.
 ## The generated MOC files are included automatically as headers.
 set(SRC_FILES
@@ -43,6 +58,7 @@ set(SRC_FILES
 
 ## Add the "librviz_camera" executable and specify the list of source files we
 ## collected above in ``${SRC_FILES}``.
+# add_dependencies(librviz_camera librviz_camera_gencpp)
 add_executable(librviz_camera ${SRC_FILES})
 
 ## Link the librviz_camera executable with whatever Qt libraries have been defined by

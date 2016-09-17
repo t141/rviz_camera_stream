@@ -1,0 +1,7 @@
+# must be unique
+string name
+# e.g. "rviz/Grid"
+string type
+bool enable
+---
+string message

@@ -1,8 +1,10 @@
 #ifndef __RVIZ_CAMERA_STREAM_PANEL_H__
 #define __RVIZ_CAMERA_STREAM_PANEL_H__
 
+#include <librviz_camera/Display.h>
 #include <map>
 #include <QWidget>
+#include <ros/ros.h>
 
 namespace rviz
 {
@@ -22,9 +24,14 @@ private Q_SLOTS:
   // void setThickness(int thickness_percent);
 
 private:
+  ros::NodeHandle nh_;
   rviz::VisualizationManager* manager_;
   rviz::RenderPanel* render_panel_;
   rviz::Display* camera_;
+  ros::ServiceServer display_service_;
+
+  bool displayCallback(librviz_camera::DisplayRequest& req,
+    librviz_camera::DisplayResponse& res);
 
   std::map<std::string, rviz::Display*> display_;
 };

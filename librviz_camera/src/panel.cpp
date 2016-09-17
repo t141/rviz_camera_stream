@@ -26,11 +26,12 @@ Panel::Panel(QWidget* parent)
   camera_->subProp("Image Topic")->setValue("image_raw");
   camera_->subProp("Camera Info Topic")->setValue("camera_info");
 
+  display_service_ = nh_.advertiseService("add_display", &Panel::displayCallback, this);
   // TODO(lucasw) later make a service interface that can create any display...
   // though that just belong in it's own project.
-  display_["grid"] = manager_->createDisplay("rviz/Grid", "grid", true);
-  display_["grid"]->subProp("Line Style")->setValue("Billboards");
-  display_["grid"]->subProp("Color")->setValue(QColor(Qt::yellow));
+  // display_["grid"] = manager_->createDisplay("rviz/Grid", "grid", enabled);
+  // display_["grid"]->subProp("Line Style")->setValue("Billboards");
+  // display_["grid"]->subProp("Color")->setValue(QColor(Qt::yellow));
 }
 
 Panel::~Panel()
@@ -38,4 +39,23 @@ Panel::~Panel()
   delete manager_;
 }
 
+bool Panel::displayCallback(librviz_camera::Display::Request& req,
+    librviz_camera::Display::Response& res)
+{
+  if (display_.count(req.name) > 0)
+  {
+    res.message = "Display name already exists";
+    return false;
+  }
 
+  res.message = "Creating new display " + req.name + " " + req.type;
+  display_[req.name] = manager_->createDisplay(QString::fromStdString(req.type),
+                                               QString::fromStdString(req.name),
+                                               req.enable);
+
+  return true;
+}
+
+// TODO(lucasw) another service to take display name, a subprop name, and a value
+// TODO(lucasw) How to handle the value generically?  Initially only handle strings
+// then ints and floats
