@@ -3,8 +3,8 @@
   <arg name="use_rviz" default="true" />
 
 
-  <group ns="camera1">
-  <node pkg="librviz_camera" type="librviz_camera" name="librviz_camera"
+  <group ns="rviz">
+  <node pkg="librviz_camera" type="librviz_camera" name="librviz_service"
       output="screen" />
   <node pkg="tf" type="static_transform_publisher" name="camera_broadcaster"
       args="0.1 0.1 -0.5 0 0 0 1 map camera1 10" />
@@ -19,7 +19,9 @@
       binning_x: 0, binning_y: 0,
       roi: {x_offset: 0, y_offset: 0, height: 480, width: 640, do_rectify: false}}' -r 2"
       output="screen"/>
+  <!--node pkg="librviz_camera" type="demo.py" name="demo" output="screen"/-->
   </group>
+
 
   <!--
   <group ns="camera2">

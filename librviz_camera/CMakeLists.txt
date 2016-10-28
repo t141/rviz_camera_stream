@@ -35,6 +35,7 @@ add_definitions(-DQT_NO_KEYWORDS)
 add_service_files(
   FILES
   Display.srv
+  Property.srv
 )
 generate_messages(
   DEPENDENCIES
