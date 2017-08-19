@@ -61,6 +61,7 @@ set(SRC_FILES
 ## collected above in ``${SRC_FILES}``.
 # add_dependencies(librviz_camera librviz_camera_gencpp)
 add_executable(librviz_camera ${SRC_FILES})
+add_dependencies(librviz_camera librviz_camera_gencpp)
 
 ## Link the librviz_camera executable with whatever Qt libraries have been defined by
 ## the ``find_package(Qt4 ...)`` line above, or by the
