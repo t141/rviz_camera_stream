@@ -41,6 +41,7 @@
 #include <rviz/uniform_string_stream.h>
 #include <rviz/validate_floats.h>
 #include <OgreCamera.h>
+#include <OgreCompositorManager.h>
 #include <OgreHardwarePixelBuffer.h>
 #include <OgreManualObject.h>
 #include <OgreMaterialManager.h>
@@ -70,11 +71,13 @@ private:
   image_transport::ImageTransport it_;
   image_transport::CameraPublisher pub_;
   uint image_id_;
+  float far_clip_;
 public:
   sensor_msgs::CameraInfo camera_info_;
   VideoPublisher() :
     it_(nh_),
-    image_id_(0)
+    image_id_(0),
+    far_clip_(10.0)
   {
   }
 
@@ -108,6 +111,71 @@ public:
     pub_ = it_.advertiseCamera(topic, 1);
   }
 
+  //////////////////////////////////////////////////
+  // version of gazebo DepthCamera::UpdateRenderTarget()
+  void updateRenderTarget(Ogre::Camera* camera,
+      Ogre::SceneManager* scene_manager_, Ogre::RenderTarget *_target,
+      Ogre::Material *_material, const std::string &_matName)
+  {
+    Ogre::RenderSystem *render_sys;
+    render_sys = scene_manager_->getDestinationRenderSystem();
+    // Get pointer to the material pass
+    Ogre::Pass *pass = _material->getBestTechnique()->getPass(0);
+
+    // Render the depth texture
+    // OgreSceneManager::_render function automatically sets farClip to 0.
+    // Which normally equates to infinite distance. We don't want this. So
+    // we have to set the distance every time.
+    camera->setFarClipDistance(far_clip_);
+
+    Ogre::AutoParamDataSource autoParamDataSource;
+
+    Ogre::Viewport *vp = _target->getViewport(0);
+
+    // return far clip in case no renderable object is inside frustrum
+    vp->setBackgroundColour(Ogre::ColourValue(far_clip_, far_clip_, far_clip_));
+
+    Ogre::CompositorManager::getSingletonPtr()->setCompositorEnabled(vp, _matName, true);
+
+    // Need this line to render the ground plane. No idea why it's necessary.
+    render_sys->_setViewport(vp);
+    scene_manager_->_setPass(pass, true, false);
+    autoParamDataSource.setCurrentPass(pass);
+    autoParamDataSource.setCurrentViewport(vp);
+    autoParamDataSource.setCurrentRenderTarget(_target);
+    autoParamDataSource.setCurrentSceneManager(scene_manager_);
+    autoParamDataSource.setCurrentCamera(camera, true);
+
+    render_sys->setLightingEnabled(false);
+    render_sys->_setFog(Ogre::FOG_NONE);
+
+    // These two lines don't seem to do anything useful
+    render_sys->_setProjectionMatrix(
+        camera->getProjectionMatrixRS());
+    render_sys->_setViewMatrix(camera->getViewMatrix(true));
+
+    pass->_updateAutoParams(&autoParamDataSource, 1);
+
+    // NOTE: We MUST bind parameters AFTER updating the autos
+    if (pass->hasVertexProgram())
+    {
+      render_sys->bindGpuProgram(
+      pass->getVertexProgram()->_getBindingDelegate());
+
+      render_sys->bindGpuProgramParameters(Ogre::GPT_VERTEX_PROGRAM,
+        pass->getVertexProgramParameters(), 1);
+    }
+
+    if (pass->hasFragmentProgram())
+    {
+      render_sys->bindGpuProgram(
+      pass->getFragmentProgram()->_getBindingDelegate());
+
+        render_sys->bindGpuProgramParameters(Ogre::GPT_FRAGMENT_PROGRAM,
+        pass->getFragmentProgramParameters(), 1);
+    }
+  }
+
   // bool publishFrame(Ogre::RenderWindow * render_object, const std::string frame_id)
   bool publishFrame(Ogre::RenderTexture * render_object, const std::string frame_id)
   {
@@ -121,8 +189,8 @@ public:
     }
     // RenderTarget::writeContentsToFile() used as example
     // TODO(lucasw) make things const that can be
-    int height = render_object->getHeight();
-    int width = render_object->getWidth();
+    const int height = render_object->getHeight();
+    const int width = render_object->getWidth();
     // the suggested pixel format is most efficient, but other ones
     // can be used.
     Ogre::PixelFormat pf = render_object->suggestPixelFormat();
@@ -130,8 +198,10 @@ public:
     uint pixelsize = Ogre::PixelUtil::getNumElemBytes(pf);
     uint datasize = width * height * pixelsize;
 
+    // TODO(lucasw)
     // 1.05 multiplier is to avoid crash when the window is resized.
-    // There should be a better solution.
+    // There should be a better solution- don't use width height above
+    // untile after something else happens?
     uchar *data = OGRE_ALLOC_T(uchar, datasize * 1.05, Ogre::MEMCATEGORY_RENDERSYS);
     Ogre::PixelBox pb(width, height, 1, pf, data);
     render_object->copyContentsToMemory(pb, Ogre::RenderTarget::FB_AUTO);
@@ -271,7 +341,8 @@ void CameraPub::onInitialize()
       Ogre::TEX_TYPE_2D,
       640, 480,
       0,
-      Ogre::PF_R8G8B8,
+      // Ogre::PF_R8G8B8,
+      Ogre::PF_FLOAT32_R,  // for depth
       Ogre::TU_RENDERTARGET);
   render_texture_ = rtt_texture_->getBuffer()->getRenderTarget();
   render_texture_->addViewport(camera_);
@@ -281,6 +352,9 @@ void CameraPub::onInitialize()
   render_texture_->setAutoUpdated(false);
   render_texture_->setActive(false);
   render_texture_->addListener(this);
+
+  depth_material_ = Ogre::MaterialManager::getSingleton().getByName("Gazebo/DepthMap").get();
+  depth_material_->load();
 
   camera_->setNearClipDistance(0.01f);
   camera_->setPosition(0, 10, 15);
@@ -312,6 +386,9 @@ void CameraPub::preRenderTargetUpdate(const Ogre::RenderTargetEvent& evt)
 {
   // set view flags on all displays
   visibility_property_->update();
+
+  video_publisher_->updateRenderTarget(camera_, scene_manager_, render_texture_,
+      depth_material_, "Gazebo/DepthMap");
 }
 
 void CameraPub::postRenderTargetUpdate(const Ogre::RenderTargetEvent& evt)
@@ -556,7 +633,8 @@ bool CameraPub::updateCamera()
         Ogre::TEX_TYPE_2D,
         info->width, info->height,
         0,
-        Ogre::PF_R8G8B8,
+        // Ogre::PF_R8G8B8,
+        Ogre::PF_FLOAT32_R,  // for depth
         Ogre::TU_RENDERTARGET);
     render_texture_ = rtt_texture_->getBuffer()->getRenderTarget();
     render_texture_->addViewport(camera_);

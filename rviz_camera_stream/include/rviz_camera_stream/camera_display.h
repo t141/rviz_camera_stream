@@ -157,6 +157,9 @@ private:
   Ogre::Camera* camera_;
   Ogre::TexturePtr rtt_texture_;
   Ogre::RenderTexture* render_texture_;
+
+  // for depth
+  Ogre::Material* depth_material_;
 };
 
 }  // namespace rviz
