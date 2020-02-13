@@ -61,6 +61,7 @@ class  VideoPublisher;
 namespace rviz
 {
 
+class BoolProperty;
 class EnumProperty;
 class FloatProperty;
 class IntProperty;
@@ -110,6 +111,7 @@ private Q_SLOTS:
   virtual void updateDisplayNamespace();
   virtual void updateImageEncoding();
   virtual void updateNearClipDistance();
+  virtual void updatePublishDepth();
 
 private:
   std::string camera_trigger_name_;
@@ -142,6 +144,7 @@ private:
   ColorProperty* background_color_property_;
   EnumProperty* image_encoding_property_;
   FloatProperty* near_clip_property_;
+  BoolProperty* publish_depth_property_;
 
   sensor_msgs::CameraInfo::ConstPtr current_caminfo_;
   boost::mutex caminfo_mutex_;

@@ -40,6 +40,7 @@
 #include <rviz/properties/color_property.h>
 #include <rviz/uniform_string_stream.h>
 #include <rviz/validate_floats.h>
+#include <rviz/selection/selection_manager.h>
 #include <OgreCamera.h>
 #include <OgreHardwarePixelBuffer.h>
 #include <OgreManualObject.h>
@@ -109,7 +110,10 @@ public:
   }
 
   // bool publishFrame(Ogre::RenderWindow * render_object, const std::string frame_id)
-  bool publishFrame(Ogre::RenderTexture * render_object, const std::string frame_id, int encoding_option)
+  bool publishFrame(Ogre::RenderTexture * render_object,
+		    const std::string frame_id,
+		    int encoding_option,
+		    bool publish_depth=false)
   {
     if (pub_.getTopic() == "")
     {
@@ -164,9 +168,42 @@ public:
     // 1.05 multiplier is to avoid crash when the window is resized.
     // There should be a better solution.
     uchar *data = OGRE_ALLOC_T(uchar, datasize * 1.05, Ogre::MEMCATEGORY_RENDERSYS);
-    Ogre::PixelBox pb(width, height, 1, pf, data);
-    render_object->copyContentsToMemory(pb, Ogre::RenderTarget::FB_AUTO);
-
+    if (!publish_depth)
+    {
+      Ogre::PixelBox pb(width, height, 1, pf, data);
+      render_object->copyContentsToMemory(pb, Ogre::RenderTarget::FB_AUTO);
+    }
+    else
+    {
+      uint tmp_datasize = width * height * Ogre::PixelUtil::getNumElemBytes(Ogre::PF_BYTE_RGB);
+      uint8_t *tmp_data = OGRE_ALLOC_T(uchar, tmp_datasize * 1.05, Ogre::MEMCATEGORY_RENDERSYS);
+      Ogre::PixelBox pb(width, height, 1, Ogre::PF_BYTE_RGB, tmp_data);
+      render_object->copyContentsToMemory(pb, Ogre::RenderTarget::FB_AUTO);
+      float max_depth = 0;
+      for (size_t pixel = 0; pixel < width * height; ++pixel)
+      {
+	uint32_t r = tmp_data[3*pixel];
+	uint32_t g = tmp_data[3*pixel + 1];
+	uint32_t b = tmp_data[3*pixel + 2];
+        float d = static_cast<float>((r << 16) | (g << 8) | b);
+	d /= (float)0xffffff;
+	d *= render_object->getViewport(0)->getCamera()->getFarClipDistance();
+	uint16_t dd = static_cast<uint16_t>(d*1000);
+	if (d > max_depth) {
+	  max_depth = d;
+	}
+	if (OGRE_ENDIAN == OGRE_ENDIAN_BIG) {
+	  data[2*pixel] = static_cast<uint8_t>((dd >> 8) & 0x00ff);
+	  data[2*pixel + 1] = static_cast<uint8_t>(dd & 0x00ff);
+	} else {
+	  data[2*pixel] = static_cast<uint8_t>(dd & 0x00ff);
+	  data[2*pixel + 1] = static_cast<uint8_t>((dd >> 8) & 0x00ff);
+	}
+      }
+      OGRE_FREE(tmp_data, Ogre::MEMCATEGORY_RENDERSYS);
+      //ROS_ERROR_STREAM(max_depth);
+    }
+    
 
     image.header.stamp = ros::Time::now();
     image.header.seq = image_id_++;
@@ -254,6 +291,11 @@ CameraPub::CameraPub()
   near_clip_property_ = new FloatProperty("Near Clip Distance", 0.01, "Set the near clip distance",
       this, SLOT(updateNearClipDistance()));
   near_clip_property_->setMin(0.01);
+
+  publish_depth_property_ = new BoolProperty(
+    "Publish Depth", false, "If checked, depth image is published",
+    this, SLOT(updatePublishDepth()));
+				     
 }
 
 CameraPub::~CameraPub()
@@ -342,6 +384,11 @@ void CameraPub::preRenderTargetUpdate(const Ogre::RenderTargetEvent& evt)
 {
   // set view flags on all displays
   visibility_property_->update();
+  if (publish_depth_property_->getBool()) {
+    render_texture_->getViewport(0)->setMaterialScheme("Depth");
+  } else {
+    render_texture_->getViewport(0)->setMaterialScheme("");
+  }
 }
 
 void CameraPub::postRenderTargetUpdate(const Ogre::RenderTargetEvent& evt)
@@ -374,9 +421,10 @@ void CameraPub::postRenderTargetUpdate(const Ogre::RenderTargetEvent& evt)
   }
 
   int encoding_option = image_encoding_property_->getOptionInt();
-
+  bool publish_depth = publish_depth_property_->getBool();
+    
   // render_texture_->update();
-  video_publisher_->publishFrame(render_texture_, frame_id, encoding_option);
+  video_publisher_->publishFrame(render_texture_, frame_id, encoding_option, publish_depth);
 }
 
 void CameraPub::onEnable()
@@ -462,6 +510,29 @@ void CameraPub::updateNearClipDistance()
 {
 }
 
+void CameraPub::updatePublishDepth()
+{
+  if (publish_depth_property_->getBool())
+  {
+    image_encoding_property_->clearOptions();
+    image_encoding_property_->addOption("mono16", 5);
+    image_encoding_property_->setString("mono16");
+    Ogre::MaterialManager::getSingleton().addListener(
+      context_->getSelectionManager(), "Depth"
+    );
+  }
+  else
+  {
+    image_encoding_property_->clearOptions();
+    image_encoding_property_->addOption("rgb8", 0);
+    image_encoding_property_->addOption("rgba8", 1);
+    image_encoding_property_->addOption("bgr8", 2);
+    image_encoding_property_->addOption("bgra8", 3);
+    image_encoding_property_->addOption("mono8", 4);
+    image_encoding_property_->addOption("mono16", 5);
+    image_encoding_property_->setString("rgb8");
+  }
+}
 
 void CameraPub::updateBackgroundColor()
 {
